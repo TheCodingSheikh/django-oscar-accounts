@@ -143,11 +143,22 @@ class Account(models.Model):
         return self.start_date <= now < self.end_date
 
     def save(self, *args, **kwargs):
+    # Save the code in uppercase if it exists
         if self.code:
             self.code = self.code.upper()
-        # Ensure the balance is always correct when saving
+
+        # Call the real save method to save the Account instance
+        # We pass force_insert to ensure it's treated as a new object if it doesn't have an ID yet
+        creating = self._state.adding
+        super().save(force_insert=creating, *args, **kwargs)
+
+        # Now that the Account has been saved and has an ID, calculate the balance
         self.balance = self._balance()
-        return super().save(*args, **kwargs)
+
+        # If the object was just created, the balance is already set correctly.
+        # Otherwise, we need to save the object again to update the balance.
+        if not creating:
+            super().save(update_fields=['balance'])
 
     def _balance(self):
         aggregates = self.transactions.aggregate(sum=Sum('amount'))
